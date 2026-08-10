@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Theology Text Library</title>
+
+  <style>
+    :root {
+      --paper: #fbf7ef;
+      --ink: #241f1a;
+      --muted: #71695f;
+      --line: #d8cfbf;
+      --accent: #6b3f20;
+      --panel: #fffdf8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    header {
+      padding: 1.5rem max(1rem, calc((100% - 1400px) / 2));
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+    }
+
+    header p {
+      margin: .45rem 0 0;
+      color: var(--muted);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(260px, 360px) 1fr;
+      min-height: calc(100vh - 104px);
+    }
+
+    aside {
+      padding: 1rem;
+      border-right: 1px solid var(--line);
+    }
+
+    .controls {
+      display: grid;
+      gap: .7rem;
+      margin-bottom: 1rem;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: .7rem;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: white;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      color: white;
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    #status {
+      display: block;
+      min-height: 1.5rem;
+      margin-bottom: .7rem;
+      color: var(--muted);
+      font: .9rem system-ui, sans-serif;
+    }
+
+    #text-list {
+      display: grid;
+      gap: .5rem;
+    }
+
+    .text-card {
+      width: 100%;
+      padding: .85rem;
+      text-align: left;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .text-card:hover,
+    .text-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px #eadbcf;
+    }
+
+    .text-card strong,
+    .text-card small {
+      display: block;
+    }
+
+    .text-card small {
+      margin-top: .25rem;
+      color: var(--muted);
+    }
+
+    section {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 1rem;
+    }
+
+    #details {
+      min-height: 80px;
+      padding: 0 .25rem .75rem;
+    }
+
+    #details h2 {
+      margin: 0 0 .3rem;
+      font-size: 1.35rem;
+    }
+
+    #details p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    #open-pdf {
+      display: inline-block;
+      margin-top: .55rem;
+      color: var(--accent);
+    }
+
+    iframe {
+      flex: 1;
+      width: 100%;
+      min-height: 650px;
+      border: 1px solid var(--line);
+      background: white;
+    }
+
+    @media (max-width: 800px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      iframe { min-height: 550px; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Theology Text Library</h1>
+    <p>A small searchable collection of primary texts and commentaries.</p>
+  </header>
+
+  <main>
+    <aside>
+      <div class="controls">
+        <input id="search" type="search" placeholder="Search title, author, tag…">
+        <select id="sort">
+          <option value="author">Sort: Author</option>
+          <option value="title">Sort: Title</option>
+          <option value="year">Sort: Year</option>
+        </select>
+        <select id="tradition">
+          <option value="">All traditions</option>
+        </select>
+      </div>
+
+      <small id="status"></small>
+      <div id="text-list"></div>
+    </aside>
+
+    <section>
+      <div id="details">
+        <h2>Select a text</h2>
+        <p>The PDF reader will appear here.</p>
+      </div>
+
+      <iframe
+        id="pdf-viewer"
+        title="Selected theology text PDF"
+        referrerpolicy="strict-origin-when-cross-origin">
+      </iframe>
+    </section>
+  </main>
+
+  <script>
+    /*
+      ---- CONFIGURATION ----
+      Leave USE_GOOGLE_SHEET false to test with DEMO_TEXTS.
+
+      When ready:
+      1. Change USE_GOOGLE_SHEET to true.
+      2. Add your Sheet ID and restricted browser API key.
+      3. Make the Sheet readable by anyone with the link.
+      4. Keep the header names shown in SHEET_COLUMNS.
+    */
+    const CONFIG = {
+      USE_GOOGLE_SHEET: true,
+      SHEET_ID: "https://docs.google.com/spreadsheets/d/1KOJMPx0Ky1vx98nC2wB0ZCRNjGx_sRRkfNxWPaMeWeQ/edit?usp=sharing",
+      API_KEY: "AIzaSyC7b4-tUYCCIwctZ6YBre59ebFum6dOveo",
+      SHEET_NAME: "Sheet1"
+    };
+
+    const SHEET_COLUMNS = {
+      id: "ID",
+      title: "Title",
+      author: "Author",
+      tradition: "Tradition",
+      year: "Year",
+      tags: "Tags",
+      pdfUrl: "PDF URL",
+      public: "Public",
+      description: "Description"
+    };
+
+    /*
+      These are example IDs only. Replace these entries, or enable Google Sheets.
+      For a real Drive record, PDF URL can be either:
+      https://drive.google.com/file/d/FILE_ID/view
+      or merely the FILE_ID.
+    */
+    const DEMO_TEXTS = [
+      {
+        id: "demo-augustine",
+        title: "Demo: Confessions",
+        author: "Augustine of Hippo",
+        tradition: "Patristic",
+        year: 400,
+        tags: "grace, conversion, autobiography",
+        pdfUrl: "",
+        public: "TRUE",
+        description: "Demo entry—add a real Drive PDF URL in your Sheet."
+      },
+      {
+        id: "demo-aquinas",
+        title: "Demo: Summa Theologiae",
+        author: "Thomas Aquinas",
+        tradition: "Scholastic",
+        year: 1274,
+        tags: "natural theology, ethics, doctrine",
+        pdfUrl: "",
+        public: "TRUE",
+        description: "Demo entry—add a real Drive PDF URL in your Sheet."
+      }
+    ];
+
+    const state = {
+      texts: [],
+      selectedId: null
+    };
+
+    const elements = {
+      search: document.querySelector("#search"),
+      sort: document.querySelector("#sort"),
+      tradition: document.querySelector("#tradition"),
+      status: document.querySelector("#status"),
+      list: document.querySelector("#text-list"),
+      details: document.querySelector("#details"),
+      viewer: document.querySelector("#pdf-viewer")
+    };
+
+    function normalize(value) {
+      return String(value ?? "").trim();
+    }
+
+    function getDriveFileId(urlOrId) {
+      const text = normalize(urlOrId);
+      const match = text.match(/[-\w]{25,}/);
+      return match ? match[0] : "";
+    }
+
+    function toDrivePreviewUrl(urlOrId) {
+      const fileId = getDriveFileId(urlOrId);
+      return fileId
+        ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`
+        : "";
+    }
+
+    function toDriveOpenUrl(urlOrId) {
+      const fileId = getDriveFileId(urlOrId);
+      return fileId
+        ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`
+        : "";
+    }
+
+    function isPublic(text) {
+      return ["true", "yes", "1"].includes(normalize(text.public).toLowerCase());
+    }
+
+    function parseSheetRows(values) {
+      const [headers, ...rows] = values;
+      if (!headers) return [];
+
+      return rows.map(row => {
+        const record = {};
+        headers.forEach((header, index) => {
+          record[normalize(header)] = normalize(row[index]);
+        });
+
+        return {
+          id: record[SHEET_COLUMNS.id],
+          title: record[SHEET_COLUMNS.title],
+          author: record[SHEET_COLUMNS.author],
+          tradition: record[SHEET_COLUMNS.tradition],
+          year: record[SHEET_COLUMNS.year],
+          tags: record[SHEET_COLUMNS.tags],
+          pdfUrl: record[SHEET_COLUMNS.pdfUrl],
+          public: record[SHEET_COLUMNS.public],
+          description: record[SHEET_COLUMNS.description]
+        };
+      }).filter(text => text.id && text.title && isPublic(text));
+    }
+
+    async function loadTexts() {
+      if (!CONFIG.USE_GOOGLE_SHEET) {
+        elements.status.textContent = "Demo mode: showing local sample records.";
+        return DEMO_TEXTS.filter(isPublic);
+      }
+
+      const sheetId = getDriveFileId(CONFIG.SHEET_ID) || CONFIG.SHEET_ID;
+      const range = `${CONFIG.SHEET_NAME}!A:I`;
+      const endpoint =
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}` +
+        `/values/${encodeURIComponent(range)}?key=${encodeURIComponent(CONFIG.API_KEY)}`;
+
+      const response = await fetch(endpoint);
+      if (!response.ok) {
+        throw new Error(`Google Sheets returned HTTP ${response.status}.`);
+      }
+      const data = await response.json();
+      if (!data.values) {
+        throw new Error("No values found in Google Sheet.");
+      }
+      return parseSheetRows(data.values);
+    }
+
+    function escapeHtml(unsafe) {
+      return String(unsafe ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function selectText(id) {
+      state.selectedId = id;
+      const text = state.texts.find(t => t.id === id);
+      if (!text) {
+        elements.details.innerHTML = `<h2>Select a text</h2><p>The PDF reader will appear here.</p>`;
+        elements.viewer.src = "";
+        return;
+      }
+
+      // Highlight selected card
+      document.querySelectorAll(".text-card").forEach(card => {
+        if (card.dataset.id === id) {
+          card.classList.add("active");
+        } else {
+          card.classList.remove("active");
+        }
+      });
+
+      // Update details
+      const yearText = text.year ? ` (${escapeHtml(text.year)})` : "";
+      const authorText = text.author ? escapeHtml(text.author) : "Unknown Author";
+      const traditionText = text.tradition ? ` • ${escapeHtml(text.tradition)}` : "";
+
+      elements.details.innerHTML = `
+        <h2>${escapeHtml(text.title)}</h2>
+        <p><strong>${authorText}</strong>${yearText}${traditionText}</p>
+        ${text.description ? `<p style="margin-top: 0.55rem; font-style: italic; color: var(--ink);">${escapeHtml(text.description)}</p>` : ""}
+        ${text.tags ? `<p style="margin-top: 0.45rem;"><small>Tags: ${escapeHtml(text.tags)}</small></p>` : ""}
+        ${text.pdfUrl ? `<a id="open-pdf" href="${escapeHtml(toDriveOpenUrl(text.pdfUrl))}" target="_blank" rel="noopener noreferrer">Open PDF in new tab ↗</a>` : ""}
+      `;
+
+      // Load PDF iframe
+      if (text.pdfUrl) {
+        elements.viewer.style.display = "block";
+        elements.viewer.src = toDrivePreviewUrl(text.pdfUrl);
+      } else {
+        elements.viewer.style.display = "none";
+        elements.viewer.src = "";
+      }
+    }
+
+    function renderList() {
+      const searchQuery = normalize(elements.search.value).toLowerCase();
+      const sortVal = elements.sort.value;
+      const traditionVal = elements.tradition.value;
+
+      // Filter
+      let filtered = state.texts.filter(text => {
+        // Search filter
+        const matchSearch = !searchQuery ||
+          normalize(text.title).toLowerCase().includes(searchQuery) ||
+          normalize(text.author).toLowerCase().includes(searchQuery) ||
+          normalize(text.tags).toLowerCase().includes(searchQuery) ||
+          normalize(text.description).toLowerCase().includes(searchQuery);
+
+        // Tradition filter
+        const matchTradition = !traditionVal || text.tradition === traditionVal;
+
+        return matchSearch && matchTradition;
+      });
+
+      // Sort
+      filtered.sort((a, b) => {
+        if (sortVal === "author") {
+          return normalize(a.author).localeCompare(normalize(b.author));
+        } else if (sortVal === "title") {
+          return normalize(a.title).localeCompare(normalize(b.title));
+        } else if (sortVal === "year") {
+          const yearA = parseInt(a.year) || 0;
+          const yearB = parseInt(b.year) || 0;
+          return yearA - yearB;
+        }
+        return 0;
+      });
+
+      // Render
+      if (filtered.length === 0) {
+        elements.list.innerHTML = `<div style="padding: 1rem; text-align: center; color: var(--muted);">No matching texts found.</div>`;
+        return;
+      }
+
+      elements.list.innerHTML = filtered.map(text => {
+        const yearText = text.year ? ` (${escapeHtml(text.year)})` : "";
+        const authorText = text.author ? escapeHtml(text.author) : "Unknown Author";
+        const isActive = text.id === state.selectedId ? "active" : "";
+
+        return `
+          <button class="text-card ${isActive}" data-id="${escapeHtml(text.id)}">
+            <strong>${escapeHtml(text.title)}</strong>
+            <small>${authorText}${yearText}</small>
+          </button>
+        `;
+      }).join('');
+
+      // Add click listeners to cards
+      elements.list.querySelectorAll(".text-card").forEach(card => {
+        card.addEventListener("click", () => {
+          selectText(card.dataset.id);
+        });
+      });
+    }
+
+    function initTraditions() {
+      const traditions = [...new Set(state.texts.map(t => t.tradition).filter(Boolean))].sort();
+      elements.tradition.innerHTML = '<option value="">All traditions</option>' +
+        traditions.map(tr => `<option value="${escapeHtml(tr)}">${escapeHtml(tr)}</option>`).join('');
+    }
+
+    async function init() {
+      try {
+        elements.status.textContent = "Loading texts...";
+        state.texts = await loadTexts();
+        elements.status.textContent = `Loaded ${state.texts.length} text(s) successfully.`;
+      } catch (err) {
+        console.error(err);
+        elements.status.textContent = `Error: ${err.message}. Falling back to demo data.`;
+        state.texts = DEMO_TEXTS.filter(isPublic);
+      }
+
+      initTraditions();
+      renderList();
+
+      // Select first text by default
+      if (state.texts.length > 0) {
+        selectText(state.texts[0].id);
+      }
+    }
+
+    // Event Listeners
+    elements.search.addEventListener("input", renderList);
+    elements.sort.addEventListener("change", renderList);
+    elements.tradition.addEventListener("change", renderList);
+
+    // Run init
+    window.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
