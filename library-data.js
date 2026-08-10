@@ -8,7 +8,7 @@
 const LIBRARY_CONFIG = {
     USE_GOOGLE_SHEET: true,
     SHEET_ID: "https://docs.google.com/spreadsheets/d/1KOJMPx0Ky1vx98nC2wB0ZCRNjGx_sRRkfNxWPaMeWeQ/edit?usp=sharing",
-    API_KEY: "AIzaSyC7b4-tUYCCIwctZ6YBre59ebFum6dOveo",
+    API_KEY: "AIzaSyC8_tt_9el-5cVDE-2cTLTDDmTdk5mkZRg",
     SHEET_NAME: "Sheet1"
 };
 
