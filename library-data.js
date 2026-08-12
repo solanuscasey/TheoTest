@@ -7,8 +7,8 @@
 
 const LIBRARY_CONFIG = {
     USE_GOOGLE_SHEET: true,
-    SHEET_ID: "https://docs.google.com/spreadsheets/d/1KOJMPx0Ky1vx98nC2wB0ZCRNjGx_sRRkfNxWPaMeWeQ/edit?usp=sharing",
-    API_KEY: "AIzaSyC7b4-tUYCCIwctZ6YBre59ebFum6dOveo",
+    SHEET_ID: "https://docs.google.com/spreadsheets/d/1jmZMO1afJ_hD4h9FKXwqLI3jnWJQJQPTOLbPN_QjjqE/edit?usp=sharing",
+    API_KEY: "AIzaSyDfsHvbiANU-C8qtOWlfIFQIWB8WVtjjzE",
     SHEET_NAME: "Sheet1"
 };
 
@@ -125,30 +125,23 @@ function parseLibraryRows(values) {
 
 /** Fetch all public entries from the Google Sheet (falls back to demo data). */
 async function loadLibraryTexts() {
-    let texts;
     if (!LIBRARY_CONFIG.USE_GOOGLE_SHEET) {
-        texts = LIBRARY_DEMO_TEXTS.filter(isPublic);
-    } else {
-        const sheetId  = getDriveFileId(LIBRARY_CONFIG.SHEET_ID) || LIBRARY_CONFIG.SHEET_ID;
-        const range    = `${LIBRARY_CONFIG.SHEET_NAME}!A:J`;
-        const endpoint =
-            `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}` +
-            `/values/${encodeURIComponent(range)}?key=${encodeURIComponent(LIBRARY_CONFIG.API_KEY)}`;
-
-        const response = await fetch(endpoint);
-        if (!response.ok) throw new Error(`Google Sheets returned HTTP ${response.status}.`);
-
-        const data = await response.json();
-        if (!data.values) throw new Error("No values found in Google Sheet.");
-
-        texts = parseLibraryRows(data.values);
+        return LIBRARY_DEMO_TEXTS.filter(isPublic);
     }
 
-    // Populate module-level reader state so reader overlay works immediately
-    _readerWorks = texts;
-    texts.forEach(w => { _worksById[w.id] = w; });
+    const sheetId  = getDriveFileId(LIBRARY_CONFIG.SHEET_ID) || LIBRARY_CONFIG.SHEET_ID;
+    const range    = `${LIBRARY_CONFIG.SHEET_NAME}!A:J`;
+    const endpoint =
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}` +
+        `/values/${encodeURIComponent(range)}?key=${encodeURIComponent(LIBRARY_CONFIG.API_KEY)}`;
 
-    return texts;
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error(`Google Sheets returned HTTP ${response.status}.`);
+
+    const data = await response.json();
+    if (!data.values) throw new Error("No values found in Google Sheet.");
+
+    return parseLibraryRows(data.values);
 }
 
 // ─── Work Card Renderer ──────────────────────────────────────────────────────
